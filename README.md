@@ -1,16 +1,34 @@
 # Meeting Notes
 
-A Windows desktop app that records a meeting, transcribes it **locally on your GPU**
-with speaker labels, uses a **local LLM** to pull out a summary + action items, and
-pushes those action items into ClickUp as tasks — so you can listen instead of
-taking notes. **No per-meeting cost: no transcription fees, no LLM API tokens.**
+A Windows desktop app that records a meeting, transcribes it (**locally on your GPU
+or in the cloud**), uses an LLM (**a local model or Claude/OpenAI**) to pull out a
+summary + action items, and optionally turns those into ClickUp tasks — so you can
+listen instead of taking notes. Run it **fully local and free**, or **fully cloud
+with just API keys** — your choice, per meeting.
 
 ```
 🎙️ Record (mic + system audio)
-   → 📝 WhisperX transcribes + diarizes on your GPU      (free, local)
-   → 🤖 Ollama extracts summary / decisions / action items (free, local)
-   → 📋 One click sends action items to ClickUp as tasks
+   → 📝 Transcribe — WhisperX (local GPU) or AssemblyAI (cloud)
+   → 🤖 Summarize + extract action items — Ollama (local) or Claude / OpenAI
+   → 📋 Keep in the in-app Meetings library, or auto-create ClickUp tasks
 ```
+
+## Quick start (for collaborators)
+
+```sh
+git clone https://github.com/chihapper/meeting-notes
+cd meeting-notes
+npm install
+npm start
+```
+
+On first launch a **setup wizard** asks how you want to run it and collects only the
+keys your choices need. Two easy paths:
+
+- **Easiest (no installs):** Cloud transcription (AssemblyAI key) + Claude or OpenAI
+  summary + keep action items in the app. Two API keys and you're done.
+- **Free + private:** Local WhisperX + local Ollama (needs Python 3.12 + WhisperX and
+  Ollama installed — see [One-time setup](#one-time-setup)).
 
 ## First run: the setup wizard
 
