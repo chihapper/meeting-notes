@@ -17,6 +17,7 @@ async function startRecording() {
   chunks = [];
   activeStreams = [];
   $('progress').classList.add('hidden');
+  $('callBanner').classList.add('hidden');
 
   const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   activeStreams.push(micStream);
@@ -548,6 +549,7 @@ async function openSettings() {
   $('clickupKey').value = s.clickupKey || '';
   $('clickupListId').value = s.clickupListId || '';
   $('captureSystemAudio').checked = s.captureSystemAudio !== false;
+  $('watchCalls').checked = !!s.watchCalls;
   $('assemblyaiKey').value = s.assemblyaiKey || '';
   $('hfToken').value = s.hfToken || '';
   $('whisperModel').value = s.whisperModel || 'medium';
@@ -576,6 +578,7 @@ function readSettingsForm() {
     clickupKey: $('clickupKey').value.trim(),
     clickupListId: $('clickupListId').value.trim(),
     captureSystemAudio: $('captureSystemAudio').checked,
+    watchCalls: $('watchCalls').checked,
     assemblyaiKey: $('assemblyaiKey').value.trim(),
     hfToken: $('hfToken').value.trim(),
     whisperModel: $('whisperModel').value.trim() || 'medium',
@@ -767,6 +770,25 @@ $('wizardSkip').onclick = async () => {
 
 // Live progress from the backend drives the staged bar.
 window.api.onProgress((p) => setProgress(p.stage, p.message));
+
+// Zoom/Teams call detected → offer to record (unless already recording).
+window.api.onCallDetected((app) => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  $('callBannerText').textContent = `Looks like you're in a ${app} call — record it?`;
+  showView('record');
+  $('callBanner').classList.remove('hidden');
+});
+$('callRecordBtn').onclick = async () => {
+  $('callBanner').classList.add('hidden');
+  if (!(mediaRecorder && mediaRecorder.state === 'recording')) {
+    try {
+      await startRecording();
+    } catch (err) {
+      setStatus(`Could not start recording: ${err.message}`);
+    }
+  }
+};
+$('callDismissBtn').onclick = () => $('callBanner').classList.add('hidden');
 
 // ---------- Startup ----------
 

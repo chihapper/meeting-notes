@@ -8,7 +8,8 @@ const store = require('./store');
 const { transcribe: transcribeLocal } = require('./services/transcribe');
 const { transcribe: transcribeCloud } = require('./services/transcribe_cloud');
 const { summarize } = require('./services/summarize');
-const { createTask, createParentTask, attachTranscript, getListUrl } = require('./services/clickup');
+const { createTask, createParentTask, attachFile, getListUrl } = require('./services/clickup');
+const { buildMeetingDocx } = require('./services/docgen');
 const { testConnections, checkReadiness } = require('./services/diagnostics');
 
 let mainWindow = null;
@@ -45,6 +46,7 @@ function createWindow() {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.meetingnotes.app'); // so Windows toasts show the app name
   createWindow();
+  startCallWatcher();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -69,6 +71,65 @@ function notifyDone(meeting) {
   }).show();
 }
 
+// ---- Zoom/Teams call detection (Windows) ----
+// Checks the Windows mic ConsentStore for an app (Zoom/Teams) currently using the
+// mic (LastUsedTimeStop == 0 means in use right now). Best-effort + heuristic.
+const { spawn } = require('child_process');
+
+const CALL_PROBE = `
+$ErrorActionPreference='SilentlyContinue'
+$base='HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone'
+$apps=@()
+foreach($k in (Get-ChildItem "$base\\NonPackaged")){ if((Get-ItemProperty $k.PSPath).LastUsedTimeStop -eq 0){ $apps+=$k.PSChildName } }
+foreach($k in (Get-ChildItem $base | Where-Object {$_.PSChildName -ne 'NonPackaged'})){ if((Get-ItemProperty $k.PSPath).LastUsedTimeStop -eq 0){ $apps+=$k.PSChildName } }
+$m=$apps | Where-Object { $_ -match 'zoom' -or $_ -match 'teams' } | Select-Object -First 1
+if($m){ if($m -match 'zoom'){'Zoom'} else {'Teams'} }
+`;
+
+function detectCallApp() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(null);
+    const proc = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', CALL_PROBE]);
+    let out = '';
+    proc.stdout.on('data', (d) => (out += d.toString()));
+    proc.on('error', () => resolve(null));
+    proc.on('close', () => {
+      const app = out.trim().split(/\r?\n/)[0];
+      resolve(app === 'Zoom' || app === 'Teams' ? app : null);
+    });
+  });
+}
+
+let lastInCall = false;
+
+function promptRecord(app) {
+  mainWindow?.webContents.send('call-detected', app);
+  if (Notification.isSupported()) {
+    const n = new Notification({ title: `${app} call detected`, body: 'Click to record this call in Meeting Notes.' });
+    n.on('click', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    });
+    n.show();
+  }
+}
+
+async function checkForCall() {
+  if (!loadSettings().watchCalls) {
+    lastInCall = false;
+    return;
+  }
+  const app = await detectCallApp();
+  const inCall = !!app;
+  if (inCall && !lastInCall) promptRecord(app); // rising edge → prompt once per call
+  lastInCall = inCall;
+}
+
+function startCallWatcher() {
+  setInterval(checkForCall, 8000);
+}
+
 // ---- IPC handlers ----
 
 ipcMain.handle('settings:get', () => loadSettings());
@@ -87,10 +148,15 @@ ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
     const result = await summarize(settings, transcript);
     sendProgress('saving', 'Saving…');
     const now = new Date();
+    const attendees = (result.attendees || []).filter(Boolean);
+    const who = attendees.length
+      ? ` with ${attendees.slice(0, 4).join(', ')}${attendees.length > 4 ? ' +others' : ''}`
+      : '';
     const meeting = {
       id: `m_${Date.now()}`,
       date: now.toISOString(),
-      title: `Meeting — ${now.toLocaleString()}`,
+      title: `Meeting${who} — ${now.toLocaleString()}`,
+      attendees,
       summary: result.summary || '',
       decisions: result.decisions || [],
       actionItems: (result.actionItems || []).map((it) => ({ ...it, done: false })),
@@ -108,7 +174,14 @@ ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
         meeting.clickupParentId = parent.id;
         meeting.clickupParentUrl = parent.url;
         try {
-          await attachTranscript(key, parent.id, meeting.transcript);
+          const docBuf = await buildMeetingDocx(meeting);
+          await attachFile(
+            key,
+            parent.id,
+            docBuf,
+            'meeting-notes.docx',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          );
         } catch (e) {
           meeting.clickupAttachError = e.message;
         }

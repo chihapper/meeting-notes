@@ -8,6 +8,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const SCHEMA = {
   type: 'object',
   properties: {
+    attendees: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
     decisions: { type: 'array', items: { type: 'string' } },
     actionItems: {
@@ -24,17 +25,19 @@ const SCHEMA = {
       },
     },
   },
-  required: ['summary', 'decisions', 'actionItems'],
+  required: ['attendees', 'summary', 'decisions', 'actionItems'],
 };
 
 const SYSTEM = `You read meeting transcripts and extract an executive summary, the key decisions, and a clean list of action items. Be specific. Only list action items that were genuinely agreed or clearly implied — do not invent work. Attribute each action item to the speaker who owns it when the transcript makes it clear (use "Unassigned" otherwise).
+
+attendees: list the participants by name if their names are identifiable from the conversation (people who introduce themselves, are addressed by name, or are clearly speaking). Use real names, not "Speaker A". If no names can be determined, use an empty array.
 
 For EACH action item:
 - priority: infer it from the conversation. Urgency cues like "urgent", "ASAP", "critical", "blocker", or a hard same-day deadline → "urgent"; an important task or a firm near-term deadline → "high"; ordinary follow-ups → "normal"; "no rush", "eventually", "whenever", "nice to have" → "low".
 - dueDate: if a deadline is stated or implied (e.g. "by Friday", "end of the week", "next Tuesday", "in two weeks", "tomorrow"), resolve it to an ABSOLUTE calendar date in YYYY-MM-DD format using the meeting date provided below. If no deadline is mentioned, use an empty string.
 
 Respond with ONLY a single JSON object of this shape (no prose, no markdown fences):
-{"summary": string, "decisions": string[], "actionItems": [{"task": string, "owner": string, "dueDate": string, "priority": "urgent"|"high"|"normal"|"low"}]}`;
+{"attendees": string[], "summary": string, "decisions": string[], "actionItems": [{"task": string, "owner": string, "dueDate": string, "priority": "urgent"|"high"|"normal"|"low"}]}`;
 
 const userPrompt = (transcript, today) =>
   `The meeting took place on ${today}. Resolve any relative due dates ("Friday", "next week", "tomorrow", …) to absolute YYYY-MM-DD dates relative to that.\n\nHere is the transcript. Produce the summary, decisions, and action items.\n\n---\n${transcript}\n---`;

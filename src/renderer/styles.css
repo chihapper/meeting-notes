@@ -96,6 +96,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .record.disabled:hover { filter: none; }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,93,93,0.5); } 50% { box-shadow: 0 0 0 10px rgba(255,93,93,0); } }
 
+.call-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 760px; margin: 0 auto 14px; padding: 10px 14px;
+  background: var(--panel-2); border: 1px solid var(--accent); border-radius: 10px;
+}
+.call-banner-actions { display: flex; gap: 8px; white-space: nowrap; }
+
 .mode-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .mode-label { color: var(--muted); font-size: 13px; }
 .seg { padding: 6px 14px; font-size: 13px; }

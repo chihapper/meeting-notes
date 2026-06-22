@@ -32,6 +32,8 @@ const DEFAULTS = {
 
   // Recording
   captureSystemAudio: true,
+  // Watch for Zoom/Teams calls (mic in use) and prompt to record
+  watchCalls: false,
 
   // WhisperX (local transcription on the GPU)
   pythonPath: 'python',

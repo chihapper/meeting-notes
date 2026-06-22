@@ -83,17 +83,17 @@ async function createParentTask(apiKey, listId, meeting) {
   return { id: json.id, url: json.url };
 }
 
-// Attach the full transcript as a .txt file on the meeting (parent) task.
-async function attachTranscript(apiKey, taskId, transcript) {
-  if (!transcript || !transcript.trim()) return;
+// Attach a file (buffer) to a task — used for the meeting-notes .docx.
+async function attachFile(apiKey, taskId, buffer, filename, mime) {
+  if (!buffer || !buffer.length) return;
   const form = new FormData();
-  form.append('attachment', new Blob([transcript], { type: 'text/plain' }), 'transcript.txt');
+  form.append('attachment', new Blob([buffer], { type: mime || 'application/octet-stream' }), filename);
   const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/attachment`, {
     method: 'POST',
     headers: { Authorization: apiKey }, // do NOT set content-type; fetch adds the multipart boundary
     body: form,
   });
-  if (!res.ok) throw new Error(`ClickUp transcript attachment failed (${res.status}): ${await res.text()}`);
+  if (!res.ok) throw new Error(`ClickUp attachment failed (${res.status}): ${await res.text()}`);
 }
 
 // Best-effort deep link to the list in the ClickUp web app. Needs the team/
@@ -112,4 +112,4 @@ async function getListUrl(apiKey, listId) {
   }
 }
 
-module.exports = { createTask, createParentTask, attachTranscript, getListUrl };
+module.exports = { createTask, createParentTask, attachFile, getListUrl };
