@@ -550,6 +550,9 @@ async function openSettings() {
   $('clickupListId').value = s.clickupListId || '';
   $('captureSystemAudio').checked = s.captureSystemAudio !== false;
   $('watchCalls').checked = !!s.watchCalls;
+  $('runInBackground').checked = !!s.runInBackground;
+  $('autoStartLogin').checked = !!s.autoStartLogin;
+  $('autoQuitNoCall').checked = !!s.autoQuitNoCall;
   $('assemblyaiKey').value = s.assemblyaiKey || '';
   $('hfToken').value = s.hfToken || '';
   $('whisperModel').value = s.whisperModel || 'medium';
@@ -579,6 +582,9 @@ function readSettingsForm() {
     clickupListId: $('clickupListId').value.trim(),
     captureSystemAudio: $('captureSystemAudio').checked,
     watchCalls: $('watchCalls').checked,
+    runInBackground: $('runInBackground').checked,
+    autoStartLogin: $('autoStartLogin').checked,
+    autoQuitNoCall: $('autoQuitNoCall').checked,
     assemblyaiKey: $('assemblyaiKey').value.trim(),
     hfToken: $('hfToken').value.trim(),
     whisperModel: $('whisperModel').value.trim() || 'medium',
@@ -789,6 +795,8 @@ $('callRecordBtn').onclick = async () => {
   }
 };
 $('callDismissBtn').onclick = () => $('callBanner').classList.add('hidden');
+// Call ended (you left / it hung up) — clear the prompt automatically.
+window.api.onCallEnded(() => $('callBanner').classList.add('hidden'));
 
 // ---------- Startup ----------
 

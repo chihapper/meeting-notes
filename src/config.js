@@ -34,6 +34,10 @@ const DEFAULTS = {
   captureSystemAudio: true,
   // Watch for Zoom/Teams calls (mic in use) and prompt to record
   watchCalls: false,
+  // Background / tray behavior
+  runInBackground: false, // closing the window hides to the tray instead of quitting
+  autoStartLogin: false, // launch (hidden) at Windows login
+  autoQuitNoCall: false, // quit when neither Zoom nor Teams is running (background mode only)
 
   // WhisperX (local transcription on the GPU)
   pythonPath: 'python',

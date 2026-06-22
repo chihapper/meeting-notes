@@ -26,4 +26,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('call-detected', handler);
     return () => ipcRenderer.removeListener('call-detected', handler);
   },
+  onCallEnded: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('call-ended', handler);
+    return () => ipcRenderer.removeListener('call-ended', handler);
+  },
 });

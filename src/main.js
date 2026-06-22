@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Notification, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Notification, shell, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const zlib = require('zlib');
 
 const { loadSettings, saveSettings } = require('./config');
 const store = require('./store');
@@ -13,6 +14,8 @@ const { buildMeetingDocx } = require('./services/docgen');
 const { testConnections, checkReadiness } = require('./services/diagnostics');
 
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -22,11 +25,20 @@ function createWindow() {
     minHeight: 560,
     title: 'Meeting Notes',
     backgroundColor: '#0f1115',
+    show: false, // shown explicitly unless launched hidden into the tray
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // In background mode, closing the window hides it to the tray instead of quitting.
+  mainWindow.on('close', (e) => {
+    if (!isQuitting && loadSettings().runInBackground) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   // Enable system-audio loopback capture for getDisplayMedia() in the renderer.
@@ -43,16 +55,112 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+// Build a small tray icon (a filled accent dot) in-memory — no icon file needed.
+function makeTrayImage() {
+  const W = 32;
+  const H = 32;
+  const cx = 15.5;
+  const cy = 15.5;
+  const r = 15;
+  const px = Buffer.alloc(W * H * 4);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (Math.hypot(x - cx, y - cy) <= r) {
+        px[i] = 0x6e;
+        px[i + 1] = 0xa8;
+        px[i + 2] = 0xfe;
+        px[i + 3] = 0xff;
+      }
+    }
+  }
+  const raw = Buffer.alloc(H * (1 + W * 4));
+  for (let y = 0; y < H; y++) px.copy(raw, y * (1 + W * 4) + 1, y * W * 4, (y + 1) * W * 4);
+  const idat = zlib.deflateSync(raw);
+  const crc32 = (b) => {
+    let c = ~0;
+    for (let i = 0; i < b.length; i++) {
+      c ^= b[i];
+      for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+    return (~c) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(W, 0);
+  ihdr.writeUInt32BE(H, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  const png = Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
+  return nativeImage.createFromBuffer(png);
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(makeTrayImage());
+  tray.setToolTip('Meeting Notes');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open Meeting Notes', click: () => showMainWindow() },
+      { type: 'separator' },
+      { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
+    ])
+  );
+  tray.on('click', () => showMainWindow());
+}
+
+// Apply login-item + tray state from settings (called at startup and after Save).
+function applyBackgroundSettings(s) {
+  if (process.platform === 'win32') {
+    app.setLoginItemSettings({ openAtLogin: !!s.autoStartLogin, args: ['--hidden'] });
+  }
+  if (s.runInBackground) {
+    createTray();
+  } else if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
+
 app.whenReady().then(() => {
   app.setAppUserModelId('com.meetingnotes.app'); // so Windows toasts show the app name
+  const settings = loadSettings();
   createWindow();
+  applyBackgroundSettings(settings);
+
+  // Stay hidden in the tray when launched at login (or with --hidden) in background mode.
+  const launchedHidden =
+    process.argv.includes('--hidden') ||
+    (process.platform === 'win32' && app.getLoginItemSettings().wasOpenedAtLogin);
+  if (!(settings.runInBackground && launchedHidden)) {
+    mainWindow.show();
+  }
+
   startCallWatcher();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  app.on('activate', () => showMainWindow());
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 app.on('window-all-closed', () => {
+  // In background mode the window only hides, so this won't fire; quit otherwise.
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -76,6 +184,8 @@ function notifyDone(meeting) {
 // mic (LastUsedTimeStop == 0 means in use right now). Best-effort + heuristic.
 const { spawn } = require('child_process');
 
+// Outputs two lines: (1) the app currently using the mic — "Zoom"/"Teams"/blank;
+// (2) "1" if a Zoom/Teams process is running at all, else "0".
 const CALL_PROBE = `
 $ErrorActionPreference='SilentlyContinue'
 $base='HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone'
@@ -83,19 +193,24 @@ $apps=@()
 foreach($k in (Get-ChildItem "$base\\NonPackaged")){ if((Get-ItemProperty $k.PSPath).LastUsedTimeStop -eq 0){ $apps+=$k.PSChildName } }
 foreach($k in (Get-ChildItem $base | Where-Object {$_.PSChildName -ne 'NonPackaged'})){ if((Get-ItemProperty $k.PSPath).LastUsedTimeStop -eq 0){ $apps+=$k.PSChildName } }
 $m=$apps | Where-Object { $_ -match 'zoom' -or $_ -match 'teams' } | Select-Object -First 1
-if($m){ if($m -match 'zoom'){'Zoom'} else {'Teams'} }
+$mic = if($m){ if($m -match 'zoom'){'Zoom'} else {'Teams'} } else { '' }
+$running = if(Get-Process -Name 'Zoom','Teams','ms-teams' -ErrorAction SilentlyContinue){'1'}else{'0'}
+Write-Output $mic
+Write-Output $running
 `;
 
-function detectCallApp() {
+function probeCalls() {
   return new Promise((resolve) => {
-    if (process.platform !== 'win32') return resolve(null);
+    if (process.platform !== 'win32') return resolve({ app: null, running: false });
     const proc = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', CALL_PROBE]);
     let out = '';
     proc.stdout.on('data', (d) => (out += d.toString()));
-    proc.on('error', () => resolve(null));
+    proc.on('error', () => resolve({ app: null, running: false }));
     proc.on('close', () => {
-      const app = out.trim().split(/\r?\n/)[0];
-      resolve(app === 'Zoom' || app === 'Teams' ? app : null);
+      const lines = out.split(/\r?\n/).map((l) => l.trim());
+      const app = lines[0] === 'Zoom' || lines[0] === 'Teams' ? lines[0] : null;
+      const running = lines.includes('1');
+      resolve({ app, running });
     });
   });
 }
@@ -106,24 +221,32 @@ function promptRecord(app) {
   mainWindow?.webContents.send('call-detected', app);
   if (Notification.isSupported()) {
     const n = new Notification({ title: `${app} call detected`, body: 'Click to record this call in Meeting Notes.' });
-    n.on('click', () => {
-      if (!mainWindow) return;
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    });
+    n.on('click', () => showMainWindow());
     n.show();
   }
 }
 
 async function checkForCall() {
-  if (!loadSettings().watchCalls) {
+  const s = loadSettings();
+  if (!s.watchCalls && !s.autoQuitNoCall) {
     lastInCall = false;
     return;
   }
-  const app = await detectCallApp();
-  const inCall = !!app;
-  if (inCall && !lastInCall) promptRecord(app); // rising edge → prompt once per call
-  lastInCall = inCall;
+  const { app: callApp, running } = await probeCalls();
+
+  if (s.watchCalls) {
+    const inCall = !!callApp;
+    if (inCall && !lastInCall) promptRecord(callApp); // call started → prompt
+    if (!inCall && lastInCall) mainWindow?.webContents.send('call-ended'); // call ended → dismiss banner
+    lastInCall = inCall;
+  }
+
+  // Auto-quit when no call app is running — only while hidden in the tray, to avoid
+  // closing a window you're actively using.
+  if (s.autoQuitNoCall && s.runInBackground && !running && mainWindow && !mainWindow.isVisible()) {
+    isQuitting = true;
+    app.quit();
+  }
 }
 
 function startCallWatcher() {
@@ -133,7 +256,11 @@ function startCallWatcher() {
 // ---- IPC handlers ----
 
 ipcMain.handle('settings:get', () => loadSettings());
-ipcMain.handle('settings:save', (_e, partial) => saveSettings(partial));
+ipcMain.handle('settings:save', (_e, partial) => {
+  const merged = saveSettings(partial);
+  applyBackgroundSettings(merged);
+  return merged;
+});
 
 // Record -> transcribe -> summarize -> save to the local meetings library.
 ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
