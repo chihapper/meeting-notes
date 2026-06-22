@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Notes</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        Meeting Notes
+      </div>
+      <div class="nav">
+        <button id="navRecord" class="navbtn active">Record</button>
+        <button id="navMeetings" class="navbtn">Meetings</button>
+      </div>
+      <button id="settingsBtn" class="ghost" title="Settings">⚙ Settings</button>
+    </header>
+
+    <main>
+      <!-- RECORD VIEW -->
+      <section id="recordView">
+        <section class="recorder">
+          <div class="mode-toggle">
+            <span class="mode-label">Transcription</span>
+            <button id="modeLocal" class="seg" data-mode="local">Local GPU</button>
+            <button id="modeCloud" class="seg" data-mode="cloud">Cloud</button>
+          </div>
+          <button id="recordBtn" class="record">● Record</button>
+          <div id="timer" class="timer">00:00</div>
+          <div id="status" class="status">Ready.</div>
+
+          <div id="progress" class="progress hidden">
+            <div class="bar"><div id="barFill" class="bar-fill"></div></div>
+            <div class="steps">
+              <span class="step" data-step="transcribing">Transcribe</span>
+              <span class="step" data-step="summarizing">Summarize</span>
+              <span class="step" data-step="done">Done</span>
+            </div>
+            <div id="firstRunHint" class="meta hidden">First run downloads the speech model (~1.5 GB) — one-time, may take a few minutes.</div>
+          </div>
+        </section>
+
+        <section id="results" class="results hidden">
+          <div id="speakersCard" class="card hidden">
+            <div class="card-head">
+              <h2>Name the speakers</h2>
+              <button id="applyNamesBtn" class="primary small">Apply names</button>
+            </div>
+            <div id="speakers" class="speakers"></div>
+          </div>
+
+          <div class="card">
+            <h2>Summary</h2>
+            <p id="summary"></p>
+          </div>
+
+          <div class="card">
+            <h2>Decisions</h2>
+            <ul id="decisions"></ul>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Action items</h2>
+              <button id="pushAllBtn" class="primary small hidden">Add all to ClickUp</button>
+            </div>
+            <div id="actionItems" class="action-list"></div>
+            <div id="savedNote" class="meta hidden">✓ Saved to your Meetings library.</div>
+            <div id="clickupLink" class="clickup-link hidden"></div>
+          </div>
+
+          <details class="card">
+            <summary>Full transcript</summary>
+            <pre id="transcript" class="transcript"></pre>
+          </details>
+        </section>
+      </section>
+
+      <!-- MEETINGS VIEW -->
+      <section id="meetingsView" class="hidden">
+        <div id="meetingsEmpty" class="meta">No meetings yet — record one from the Record tab.</div>
+        <div id="meetingsList" class="meetings-list"></div>
+      </section>
+    </main>
+
+    <!-- Settings modal -->
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-box">
+        <h2>Settings</h2>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="general">General</button>
+          <button class="tab" data-tab="local">Local</button>
+          <button class="tab" data-tab="cloud">Cloud</button>
+        </div>
+
+        <!-- GENERAL -->
+        <div class="tab-pane active" data-pane="general">
+          <h3 class="group">Summarization</h3>
+          <label>
+            <span class="field-label">Engine
+              <span class="info" data-tip="Which AI writes the summary and action items. Ollama runs free on your machine; Claude and OpenAI are paid cloud APIs (no local install).">i</span>
+            </span>
+            <select id="summarizerMode">
+              <option value="ollama">Ollama — local, free (needs Ollama installed)</option>
+              <option value="claude">Claude — cloud (Anthropic API key)</option>
+              <option value="openai">OpenAI — cloud (OpenAI API key)</option>
+            </select>
+          </label>
+          <div id="sumOllama" class="cond">
+            <label>
+              <span class="field-label">Ollama URL
+                <span class="info" data-tip="Address of your local Ollama server. Leave as http://localhost:11434 when Ollama runs on this PC.">i</span>
+              </span>
+              <input id="ollamaUrl" type="text" placeholder="http://localhost:11434" />
+            </label>
+            <label>
+              <span class="field-label">Model
+                <span class="info" data-tip="The models you've pulled in Ollama. To add one: run 'ollama pull <name>' (e.g. qwen3.5), then click ↻ to refresh this list.">i</span>
+              </span>
+              <div class="model-row">
+                <select id="ollamaModel"></select>
+                <button id="ollamaRefresh" class="small ghost" type="button" title="Refresh model list from Ollama">↻</button>
+              </div>
+            </label>
+            <label class="checkbox">
+              <input id="unloadOllama" type="checkbox" />
+              Unload model after each summary
+              <span class="info" data-tip="Frees the model's VRAM right after summarizing. Turn on for back-to-back meetings on a smaller GPU.">i</span>
+            </label>
+          </div>
+          <div id="sumClaude" class="cond hidden">
+            <label>
+              <span class="field-label">Anthropic API key
+                <span class="info" data-tip="Your Claude API key (starts with sk-ant-). From console.anthropic.com. Costs a few cents per meeting.">i</span>
+              </span>
+              <input id="anthropicKey" type="password" placeholder="sk-ant-..." />
+            </label>
+            <label>
+              <span class="field-label">Claude model
+                <span class="info" data-tip="Models available to your Anthropic key. Opus = most capable; Haiku = cheapest. Click ↻ after entering your key to load the live list.">i</span>
+              </span>
+              <div class="model-row">
+                <select id="anthropicModel"></select>
+                <button id="anthropicRefresh" class="small ghost" type="button" title="Refresh from Anthropic">↻</button>
+              </div>
+            </label>
+          </div>
+          <div id="sumOpenai" class="cond hidden">
+            <label>
+              <span class="field-label">OpenAI API key
+                <span class="info" data-tip="Your OpenAI API key (starts with sk-). From platform.openai.com.">i</span>
+              </span>
+              <input id="openaiKey" type="password" placeholder="sk-..." />
+            </label>
+            <label>
+              <span class="field-label">OpenAI model
+                <span class="info" data-tip="Chat models available to your OpenAI key. gpt-4o-mini is cheap and capable. Click ↻ after entering your key to load the live list.">i</span>
+              </span>
+              <div class="model-row">
+                <select id="openaiModel"></select>
+                <button id="openaiRefresh" class="small ghost" type="button" title="Refresh from OpenAI">↻</button>
+              </div>
+            </label>
+          </div>
+
+          <h3 class="group">Action items</h3>
+          <label>
+            <span class="field-label">Destination
+              <span class="info" data-tip="Where extracted action items go. Keep them in this app's Meetings tab, or push them to ClickUp as tasks.">i</span>
+            </span>
+            <select id="taskDestination">
+              <option value="native">Keep in this app (Meetings tab)</option>
+              <option value="clickup">Send to ClickUp</option>
+            </select>
+          </label>
+          <div id="destClickup" class="cond hidden">
+            <label>
+              <span class="field-label">ClickUp API token
+                <span class="info" data-tip="Your ClickUp personal API token (starts with pk_). In ClickUp: Settings → Apps.">i</span>
+              </span>
+              <input id="clickupKey" type="password" placeholder="pk_..." />
+            </label>
+            <label>
+              <span class="field-label">ClickUp List ID
+                <span class="info" data-tip="ID of the list where tasks are created — the number in the list URL, e.g. .../li/901234567.">i</span>
+              </span>
+              <input id="clickupListId" type="text" placeholder="901234567" />
+            </label>
+          </div>
+
+          <h3 class="group">Recording</h3>
+          <label class="checkbox">
+            <input id="captureSystemAudio" type="checkbox" />
+            Capture system audio (other people on calls)
+            <span class="info" data-tip="Also record other participants' audio (system/loopback), not just your mic. Required for remote meetings.">i</span>
+          </label>
+        </div>
+
+        <!-- LOCAL -->
+        <div class="tab-pane" data-pane="local">
+          <h3 class="group">Transcription — WhisperX (on your GPU)</h3>
+          <label>
+            <span class="field-label">HuggingFace token
+              <span class="info" data-tip="Free token from huggingface.co. Enables speaker labels (diarization). Accept the pyannote model terms once. Local mode only.">i</span>
+            </span>
+            <input id="hfToken" type="password" placeholder="hf_..." />
+          </label>
+          <div class="row2">
+            <label>
+              <span class="field-label">Whisper model
+                <span class="info" data-tip="Model size. Larger is more accurate but slower and uses more VRAM.">i</span>
+              </span>
+              <select id="whisperModel">
+                <option value="tiny">tiny — fastest, lowest accuracy</option>
+                <option value="base">base — fast</option>
+                <option value="small">small — light</option>
+                <option value="medium">medium — balanced</option>
+                <option value="large-v2">large-v2 — high accuracy</option>
+                <option value="large-v3">large-v3 — best accuracy (recommended)</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Device
+                <span class="info" data-tip="Where transcription runs. GPU (cuda) is far faster than CPU.">i</span>
+              </span>
+              <select id="whisperDevice">
+                <option value="cuda">GPU — cuda (recommended)</option>
+                <option value="cpu">CPU (slow; no GPU needed)</option>
+              </select>
+            </label>
+          </div>
+          <div class="row2">
+            <label>
+              <span class="field-label">Compute type
+                <span class="info" data-tip="Precision. int8 is best on GTX 10-series (Pascal); float16 is faster on RTX 20-series and newer; float32 is most accurate.">i</span>
+              </span>
+              <select id="whisperCompute">
+                <option value="int8">int8 — best for GTX 10-series</option>
+                <option value="float16">float16 — RTX 20-series and newer</option>
+                <option value="float32">float32 — most accurate, most VRAM</option>
+                <option value="int8_float16">int8_float16 — mixed precision</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Language
+                <span class="info" data-tip="Spoken language. Auto-detect is reliable; set it explicitly to skip detection.">i</span>
+              </span>
+              <select id="whisperLanguage">
+                <option value="">Auto-detect</option>
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="it">Italian</option>
+                <option value="pt">Portuguese</option>
+                <option value="nl">Dutch</option>
+                <option value="ru">Russian</option>
+                <option value="zh">Chinese</option>
+                <option value="ja">Japanese</option>
+                <option value="ko">Korean</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span class="field-label">Python path
+              <span class="info" data-tip="How to launch Python if 'python' isn't on your PATH — e.g. 'py' or a full path to python.exe.">i</span>
+            </span>
+            <input id="pythonPath" type="text" placeholder="python" />
+          </label>
+        </div>
+
+        <!-- CLOUD -->
+        <div class="tab-pane" data-pane="cloud">
+          <h3 class="group">Transcription — AssemblyAI (cloud)</h3>
+          <p class="pane-note">Used when the <strong>Transcription</strong> toggle on the main screen is set to <strong>Cloud</strong>. ~$0.17/hr of audio; audio is uploaded to AssemblyAI.</p>
+          <label>
+            <span class="field-label">AssemblyAI API key
+              <span class="info" data-tip="API key for AssemblyAI cloud transcription. Only needed when Transcription is set to Cloud.">i</span>
+            </span>
+            <input id="assemblyaiKey" type="password" placeholder="aai-..." />
+          </label>
+        </div>
+
+        <div class="test-row">
+          <button id="testBtn" class="ghost">Test connections</button>
+          <div id="testResults" class="test-results"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="settingsCancel" class="ghost">Cancel</button>
+          <button id="settingsSave" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-run setup wizard -->
+    <div id="wizard" class="modal hidden">
+      <div class="modal-box">
+        <h2>Welcome to Meeting Notes</h2>
+        <p class="pane-note">Tell us how you'll use the app — we'll only ask for the keys your choices need. The <strong>Cloud</strong> options just need an API key (no installs, works on any PC); the <strong>Local</strong> options are free but require a Python/GPU setup. Change any of this later in Settings.</p>
+
+        <h3 class="group">1. Transcription (speech → text)</h3>
+        <div class="seg-group" id="wzTranscription">
+          <button type="button" class="seg active" data-val="cloud">Cloud (AssemblyAI)</button>
+          <button type="button" class="seg" data-val="local">Local GPU — advanced</button>
+        </div>
+        <p id="wzLocalNote" class="cond pane-note hidden">Advanced: free on your GPU, but needs Python + WhisperX installed. Add a free HuggingFace token for speaker labels.</p>
+        <label id="wzHfWrap" class="cond hidden">
+          <span class="field-label">HuggingFace token <span class="hint">(optional, for speaker labels)</span></span>
+          <input id="wzHfToken" type="password" placeholder="hf_..." />
+        </label>
+        <label id="wzAaiWrap" class="cond">
+          <span class="field-label">AssemblyAI API key <span class="hint">(~$0.17/hr of audio)</span></span>
+          <input id="wzAssemblyaiKey" type="password" placeholder="aai-..." />
+        </label>
+
+        <h3 class="group">2. Summaries &amp; action items (AI)</h3>
+        <div class="seg-group" id="wzSummarizer">
+          <button type="button" class="seg active" data-val="claude">Claude</button>
+          <button type="button" class="seg" data-val="openai">OpenAI</button>
+          <button type="button" class="seg" data-val="ollama">Local Ollama — advanced</button>
+        </div>
+        <p id="wzOllamaNote" class="cond pane-note hidden">Advanced: free on your machine, but needs Ollama installed (ollama.com) and a model pulled.</p>
+        <label id="wzAnthropicWrap" class="cond">
+          <span class="field-label">Anthropic API key <span class="hint">(a few cents per meeting)</span></span>
+          <input id="wzAnthropicKey" type="password" placeholder="sk-ant-..." />
+        </label>
+        <label id="wzOpenaiWrap" class="cond hidden">
+          <span class="field-label">OpenAI API key</span>
+          <input id="wzOpenaiKey" type="password" placeholder="sk-..." />
+        </label>
+
+        <h3 class="group">3. Where should action items go?</h3>
+        <div class="seg-group" id="wzDestination">
+          <button type="button" class="seg active" data-val="native">Keep in this app</button>
+          <button type="button" class="seg" data-val="clickup">ClickUp</button>
+        </div>
+        <div id="wzClickupWrap" class="cond hidden">
+          <label>
+            <span class="field-label">ClickUp API token</span>
+            <input id="wzClickupKey" type="password" placeholder="pk_..." />
+          </label>
+          <label>
+            <span class="field-label">ClickUp List ID</span>
+            <input id="wzClickupListId" type="text" placeholder="901234567" />
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button id="wizardSkip" class="ghost">Skip for now</button>
+          <button id="wizardFinish" class="primary">Get started</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
