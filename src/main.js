@@ -137,7 +137,17 @@ function applyBackgroundSettings(s) {
   }
 }
 
+// Single instance: if the call trigger (or the user) launches the app while it's
+// already running, focus the existing one instead of opening a second copy.
+// A "--hidden" relaunch (from the trigger, while already up) is ignored.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
+app.on('second-instance', (_e, argv) => {
+  if (!argv.includes('--hidden')) showMainWindow();
+});
+
 app.whenReady().then(() => {
+  if (!gotLock) return;
   app.setAppUserModelId('com.meetingnotes.app'); // so Windows toasts show the app name
   const settings = loadSettings();
   createWindow();
