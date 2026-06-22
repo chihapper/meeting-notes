@@ -21,10 +21,12 @@
     "productName": "Meeting Notes",
     "files": [
       "src/**/*",
+      "scripts/**/*",
       "package.json"
     ],
     "asarUnpack": [
-      "src/python/**"
+      "src/python/**",
+      "scripts/**"
     ],
     "win": {
       "target": [

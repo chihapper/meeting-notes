@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
   processRecording: (arrayBuffer) => ipcRenderer.invoke('recording:process', arrayBuffer),
   testConnections: (settings) => ipcRenderer.invoke('diagnostics:test', settings),
   checkReadiness: (settings) => ipcRenderer.invoke('readiness:check', settings),
+  getTriggerStatus: () => ipcRenderer.invoke('trigger:status'),
+  setTrigger: (enable) => ipcRenderer.invoke('trigger:set', enable),
   listOllamaModels: (url) => ipcRenderer.invoke('ollama:models', url),
   listAnthropicModels: (key) => ipcRenderer.invoke('anthropic:models', key),
   listOpenaiModels: (key) => ipcRenderer.invoke('openai:models', key),

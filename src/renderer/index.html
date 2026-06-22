@@ -213,6 +213,12 @@
 
           <h3 class="group">Background</h3>
           <label class="checkbox">
+            <input id="autoLaunchTrigger" type="checkbox" />
+            Automatically launch for Zoom/Teams meetings
+            <span class="info" data-tip="Sets up a one-time Windows trigger so the app starts only when a Zoom or Teams meeting begins — nothing runs the rest of the time. Asks for Windows admin approval once when you enable it (no PowerShell). Windows only; not Google Meet. Turning this on also enables the three options below.">i</span>
+          </label>
+          <div id="triggerStatus" class="meta"></div>
+          <label class="checkbox">
             <input id="runInBackground" type="checkbox" />
             Run in the background (system tray)
             <span class="info" data-tip="Closing the window hides the app to the system tray instead of quitting, so it can keep watching for calls and show notifications. Click the tray icon to reopen it.">i</span>

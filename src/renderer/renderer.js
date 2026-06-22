@@ -9,6 +9,7 @@ let timerInterval = null;
 let startedAt = 0;
 let currentMode = 'local'; // transcription mode
 let currentMeeting = null; // meeting shown in the record view
+let triggerInitial = false; // whether the OS launch trigger is currently installed
 
 // ---------- Recording ----------
 
@@ -553,6 +554,9 @@ async function openSettings() {
   $('runInBackground').checked = !!s.runInBackground;
   $('autoStartLogin').checked = !!s.autoStartLogin;
   $('autoQuitNoCall').checked = !!s.autoQuitNoCall;
+  triggerInitial = await window.api.getTriggerStatus();
+  $('autoLaunchTrigger').checked = triggerInitial;
+  $('triggerStatus').textContent = '';
   $('assemblyaiKey').value = s.assemblyaiKey || '';
   $('hfToken').value = s.hfToken || '';
   $('whisperModel').value = s.whisperModel || 'medium';
@@ -597,6 +601,25 @@ function readSettingsForm() {
 
 async function saveSettings() {
   await window.api.saveSettings(readSettingsForm());
+
+  // Install/remove the OS launch trigger if that toggle changed (one UAC prompt).
+  const wantTrigger = $('autoLaunchTrigger').checked;
+  if (wantTrigger !== triggerInitial) {
+    $('settingsSave').disabled = true;
+    $('triggerStatus').textContent = wantTrigger
+      ? 'Approve the Windows admin prompt to finish setup…'
+      : 'Removing the meeting trigger…';
+    const r = await window.api.setTrigger(wantTrigger);
+    $('settingsSave').disabled = false;
+    if (r.ok) {
+      triggerInitial = wantTrigger;
+    } else {
+      $('autoLaunchTrigger').checked = triggerInitial;
+      $('triggerStatus').textContent = `Could not change auto-launch: ${r.error}`;
+      return; // keep the dialog open so the error is visible
+    }
+  }
+
   $('settingsModal').classList.add('hidden');
   setStatus('Settings saved.');
   updateRecordReadiness();
@@ -750,6 +773,14 @@ $('summarizerMode').onchange = () => {
   else if (mode === 'openai') populateOpenaiModels($('openaiModel').value);
 };
 $('taskDestination').onchange = applyDestinationVisibility;
+// Auto-launch needs background + call-watch + auto-quit to behave; enable them together.
+$('autoLaunchTrigger').onchange = () => {
+  if ($('autoLaunchTrigger').checked) {
+    $('runInBackground').checked = true;
+    $('watchCalls').checked = true;
+    $('autoQuitNoCall').checked = true;
+  }
+};
 $('ollamaRefresh').onclick = () => populateOllamaModels($('ollamaModel').value);
 $('anthropicRefresh').onclick = () => populateAnthropicModels($('anthropicModel').value);
 $('openaiRefresh').onclick = () => populateOpenaiModels($('openaiModel').value);

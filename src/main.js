@@ -376,6 +376,48 @@ ipcMain.handle('clickup:listUrl', async () => {
 ipcMain.handle('diagnostics:test', (_e, settings) => testConnections(settings));
 ipcMain.handle('readiness:check', (_e, settings) => checkReadiness(settings));
 
+// --- In-app setup of the Zoom/Teams launch trigger (no manual PowerShell) ---
+// Runs the bundled setup script elevated (one UAC prompt). The task launches the
+// real exe — process.env.PORTABLE_EXECUTABLE_FILE for the portable build, else execPath.
+function triggerScriptPath() {
+  return path
+    .join(app.getAppPath(), 'scripts', 'setup-call-trigger.ps1')
+    .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+}
+function appExePath() {
+  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+}
+
+function runTriggerSetup(enable) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve({ ok: false, error: 'Windows only.' });
+    const inner = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', triggerScriptPath(), '-ExePath', appExePath()];
+    if (!enable) inner.push('-Uninstall');
+    const argList = inner.map((a) => `'${String(a).replace(/'/g, "''")}'`).join(',');
+    // Elevate via UAC and wait for the elevated script to finish.
+    const cmd = `Start-Process -FilePath powershell -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList ${argList}`;
+    const proc = spawn('powershell', ['-NoProfile', '-Command', cmd]);
+    let err = '';
+    proc.stderr.on('data', (d) => (err += d.toString()));
+    proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+    proc.on('close', (code) =>
+      resolve(code === 0 ? { ok: true } : { ok: false, error: err.trim() || 'Admin approval was declined or setup failed.' })
+    );
+  });
+}
+
+function triggerStatus() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(false);
+    const proc = spawn('schtasks', ['/query', '/TN', 'MeetingNotesZoom']);
+    proc.on('error', () => resolve(false));
+    proc.on('close', (code) => resolve(code === 0));
+  });
+}
+
+ipcMain.handle('trigger:status', () => triggerStatus());
+ipcMain.handle('trigger:set', (_e, enable) => runTriggerSetup(enable));
+
 // List the models actually pulled in the local Ollama, for the Settings dropdown.
 ipcMain.handle('ollama:models', async (_e, url) => {
   const base = (url || 'http://localhost:11434').replace(/\/$/, '');
