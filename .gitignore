@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# electron-builder cache (downloaded build tools)
+.cache/
+*.log
+.DS_Store
+# Local recordings / scratch
+recordings/

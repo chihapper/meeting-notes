@@ -1,0 +1,61 @@
+{
+  "name": "meeting-notes",
+  "version": "0.1.0",
+  "description": "Record meetings, transcribe + diarize locally with WhisperX, summarize with a local Ollama model, and push action items to ClickUp. Zero per-meeting cost.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:portable": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.meetingnotes.app",
+    "productName": "Meeting Notes",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "src/python/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName} ${version} ${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Meeting Notes"
+    },
+    "portable": {
+      "artifactName": "MeetingNotes-portable-${version}.exe"
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.1"
+  }
+}
