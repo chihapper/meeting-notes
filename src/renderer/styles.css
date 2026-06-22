@@ -189,6 +189,10 @@ details summary { cursor: pointer; color: var(--muted); text-transform: uppercas
 .tab-pane { display: none; flex-direction: column; gap: 12px; }
 .tab-pane.active { display: flex; }
 .pane-note { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.adv { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.adv > summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; }
+.adv[open] > summary { margin-bottom: 8px; }
+.adv .checkbox { font-size: 13px; }
 
 /* Field label + info icon */
 .field-label { display: flex; align-items: center; gap: 6px; }

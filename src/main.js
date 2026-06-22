@@ -230,8 +230,11 @@ let lastInCall = false;
 function promptRecord(app) {
   mainWindow?.webContents.send('call-detected', app);
   if (Notification.isSupported()) {
-    const n = new Notification({ title: `${app} call detected`, body: 'Click to record this call in Meeting Notes.' });
-    n.on('click', () => showMainWindow());
+    const n = new Notification({ title: `${app} call detected`, body: 'Click to start recording this call.' });
+    n.on('click', () => {
+      showMainWindow(); // so they can see the timer and Stop
+      mainWindow?.webContents.send('start-recording');
+    });
     n.show();
   }
 }

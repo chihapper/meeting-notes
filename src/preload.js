@@ -33,4 +33,9 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('call-ended', handler);
     return () => ipcRenderer.removeListener('call-ended', handler);
   },
+  onStartRecording: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('start-recording', handler);
+    return () => ipcRenderer.removeListener('start-recording', handler);
+  },
 });

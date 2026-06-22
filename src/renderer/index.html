@@ -205,34 +205,39 @@
             Capture system audio (other people on calls)
             <span class="info" data-tip="Also record other participants' audio (system/loopback), not just your mic. Required for remote meetings.">i</span>
           </label>
-          <label class="checkbox">
-            <input id="watchCalls" type="checkbox" />
-            Watch for Zoom/Teams calls and ask to record
-            <span class="info" data-tip="Polls for Zoom or Teams using the microphone (i.e. you're in a call) and pops up a prompt asking if you want to record it. You're always asked first — it never records automatically. Windows only.">i</span>
-          </label>
 
-          <h3 class="group">Background</h3>
+          <h3 class="group">Auto-record meetings (Windows)</h3>
+          <p class="pane-note">One switch for the whole hands-off flow: the app launches only when a Zoom/Teams meeting starts, notifies you (click the notification to start recording), and quits when the meeting apps close. For Google Meet or anything else, just open the app and hit Record.</p>
           <label class="checkbox">
             <input id="autoLaunchTrigger" type="checkbox" />
-            Automatically launch for Zoom/Teams meetings
-            <span class="info" data-tip="Sets up a one-time Windows trigger so the app starts only when a Zoom or Teams meeting begins — nothing runs the rest of the time. Asks for Windows admin approval once when you enable it (no PowerShell). Windows only; not Google Meet. Turning this on also enables the three options below.">i</span>
+            <strong>Auto-launch &amp; notify for Zoom/Teams meetings</strong>
+            <span class="info" data-tip="The all-in-one switch. Registers a one-time Windows trigger (asks for admin approval once — no PowerShell) and turns on the helper options under Advanced. Windows only; doesn't cover Google Meet.">i</span>
           </label>
           <div id="triggerStatus" class="meta"></div>
-          <label class="checkbox">
-            <input id="runInBackground" type="checkbox" />
-            Run in the background (system tray)
-            <span class="info" data-tip="Closing the window hides the app to the system tray instead of quitting, so it can keep watching for calls and show notifications. Click the tray icon to reopen it.">i</span>
-          </label>
-          <label class="checkbox">
-            <input id="autoStartLogin" type="checkbox" />
-            Start automatically at login (hidden)
-            <span class="info" data-tip="Launch the app to the tray when you sign in to Windows, so it's always ready to prompt you when a call starts.">i</span>
-          </label>
-          <label class="checkbox">
-            <input id="autoQuitNoCall" type="checkbox" />
-            Quit when neither Zoom nor Teams is running
-            <span class="info" data-tip="When running in the background, the app quits itself once both Zoom and Teams are closed (saves memory). It comes back at next login. Note: while quit, it can't catch a call you start later that session — pair with Start at login, or leave Teams running.">i</span>
-          </label>
+
+          <details class="adv">
+            <summary>Advanced (handled for you by the switch above)</summary>
+            <label class="checkbox">
+              <input id="runInBackground" type="checkbox" />
+              Run in the system tray when closed
+              <span class="info" data-tip="Closing the window hides the app to the tray instead of quitting, so it can keep watching and notifying. Required for the auto-record switch.">i</span>
+            </label>
+            <label class="checkbox">
+              <input id="watchCalls" type="checkbox" />
+              Show the record prompt when a call starts
+              <span class="info" data-tip="While the app is running, watch for Zoom/Teams using the mic and pop the record prompt. Required for the auto-record switch. It never records on its own — you're always asked.">i</span>
+            </label>
+            <label class="checkbox">
+              <input id="autoQuitNoCall" type="checkbox" />
+              Quit when both Zoom and Teams are closed
+              <span class="info" data-tip="Frees memory by quitting once neither app is running. Required for the auto-record switch so nothing lingers between meetings.">i</span>
+            </label>
+            <label class="checkbox">
+              <input id="autoStartLogin" type="checkbox" />
+              Start at login (hidden) — not needed with auto-launch
+              <span class="info" data-tip="An alternative to the trigger: keep the app resident in the tray from login. You don't need this if the auto-launch switch is on.">i</span>
+            </label>
+          </details>
         </div>
 
         <!-- LOCAL -->

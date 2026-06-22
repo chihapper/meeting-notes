@@ -113,28 +113,62 @@ The main screen has a **Transcription** toggle:
 
 - **Local GPU** (default) — WhisperX on your machine. Free, private, but ties up
   the GPU for a few minutes per meeting.
-- **Cloud** — AssemblyAI. Near-instant, no GPU strain, but costs ~$0.17/hr of audio
-  and sends the audio to AssemblyAI. Requires an AssemblyAI API key in Settings.
+- **Cloud** — AssemblyAI. Near-instant, no GPU strain. Has a **free tier that covers
+  light use**, then ~$0.15/hr of audio; sends the audio to AssemblyAI. Requires an
+  AssemblyAI API key in Settings.
 
 Pick per meeting — local for sensitive/clean-audio calls, cloud when you want a fast
-turnaround. Summarization stays local (Ollama) either way unless you change it.
+turnaround. The summarizer is whatever you set (local Ollama, or Claude/OpenAI).
 
 ## Costs
 
-**$0 per meeting.** WhisperX and Ollama run on your hardware; the only ongoing
-cost is electricity. ClickUp task creation uses your existing plan.
+Depends entirely on which engines you choose — anywhere from **$0** to a couple
+dollars a month:
+
+| Stage | Local (free) | Cloud (bring your own key) |
+|---|---|---|
+| Transcription | WhisperX on your GPU — **$0** | AssemblyAI — **free tier covers light use**, then ~$0.15/hr |
+| Summary + action items | Ollama on your GPU — **$0** | Claude / OpenAI — **a few cents per meeting** (~$1–3/mo at a few hrs/week) |
+| ClickUp tasks | included in your ClickUp plan | same |
+
+- **Fully local (WhisperX + Ollama):** $0/meeting — just electricity.
+- **Fully cloud (AssemblyAI + Claude/OpenAI):** usually a couple dollars a month for
+  normal use; AssemblyAI's free allowance means light use can still be $0, and a
+  cheap model (Claude Haiku, OpenAI `gpt-4o-mini`) adds only cents per meeting.
+
+You bring your own API keys and pay the providers directly — nothing is billed
+through this app.
 
 ## How it works
 
 | Piece | File |
 |---|---|
-| Window, loopback audio handler, IPC | `src/main.js` |
+| Window, tray, IPC, call detection, launch trigger | `src/main.js` |
 | Audio capture + mixing + UI | `src/renderer/renderer.js` |
 | WhisperX transcription + diarization (Python) | `src/python/whisperx_transcribe.py` |
-| Spawns WhisperX, returns transcript | `src/services/transcribe.js` |
-| Ollama summary + structured action items | `src/services/summarize.js` |
-| ClickUp task creation | `src/services/clickup.js` |
+| Local transcription (spawns WhisperX) | `src/services/transcribe.js` |
+| Cloud transcription (AssemblyAI) | `src/services/transcribe_cloud.js` |
+| Summary + action items (Ollama / Claude / OpenAI) | `src/services/summarize.js` |
+| ClickUp parent task + subtasks + attachment | `src/services/clickup.js` |
+| Word (.docx) meeting doc | `src/services/docgen.js` |
+| "Test connections" / readiness checks | `src/services/diagnostics.js` |
+| Local Meetings library | `src/store.js` |
 | Settings persistence (per-user app data) | `src/config.js` |
+| Zoom/Teams launch trigger setup (run by the app) | `scripts/setup-call-trigger.ps1` |
+
+## Auto-record Zoom/Teams meetings (Windows)
+
+Turn on **⚙ Settings → Auto-record meetings → "Auto-launch & notify for Zoom/Teams
+meetings"** (approve the one-time Windows admin prompt). After that the app:
+
+- launches itself only when a Zoom or Teams meeting starts (nothing runs otherwise),
+- shows a notification — **click it to start recording** (no need to open the app),
+- quits when both Zoom and Teams are closed.
+
+Notes: Windows only; doesn't cover Google Meet or browser calls (no process to hook).
+Teams fires on app launch, so after enabling, restart Teams once. Re-toggle after a
+major Teams update (its install path changes). For Meet/anything else, open the app
+and hit Record.
 
 ## Choosing the Ollama model by GPU VRAM
 

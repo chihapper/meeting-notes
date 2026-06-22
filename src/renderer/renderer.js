@@ -828,6 +828,17 @@ $('callRecordBtn').onclick = async () => {
 $('callDismissBtn').onclick = () => $('callBanner').classList.add('hidden');
 // Call ended (you left / it hung up) — clear the prompt automatically.
 window.api.onCallEnded(() => $('callBanner').classList.add('hidden'));
+// Clicking the notification starts recording straight away (no extra click).
+window.api.onStartRecording(async () => {
+  $('callBanner').classList.add('hidden');
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  try {
+    await startRecording();
+  } catch (err) {
+    setStatus(`Could not start recording: ${err.message}`);
+    setRecordingUI(false);
+  }
+});
 
 // ---------- Startup ----------
 
