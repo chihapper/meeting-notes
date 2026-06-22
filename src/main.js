@@ -394,18 +394,27 @@ function appExePath() {
 function runTriggerSetup(enable) {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') return resolve({ ok: false, error: 'Windows only.' });
-    const inner = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', triggerScriptPath(), '-ExePath', appExePath()];
-    if (!enable) inner.push('-Uninstall');
-    const argList = inner.map((a) => `'${String(a).replace(/'/g, "''")}'`).join(',');
-    // Elevate via UAC and wait for the elevated script to finish.
-    const cmd = `Start-Process -FilePath powershell -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList ${argList}`;
+    // Build the elevated command line as ONE string with the paths double-quoted —
+    // Start-Process -ArgumentList as an array drops spaces (the exe path has one).
+    const q = (s) => `"${String(s).replace(/"/g, '\\"')}"`;
+    let inner = `-NoProfile -ExecutionPolicy Bypass -File ${q(triggerScriptPath())} -ExePath ${q(appExePath())}`;
+    if (!enable) inner += ' -Uninstall';
+    const cmd = `Start-Process -FilePath powershell -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList '${inner.replace(/'/g, "''")}'`;
     const proc = spawn('powershell', ['-NoProfile', '-Command', cmd]);
     let err = '';
     proc.stderr.on('data', (d) => (err += d.toString()));
     proc.on('error', (e) => resolve({ ok: false, error: e.message }));
-    proc.on('close', (code) =>
-      resolve(code === 0 ? { ok: true } : { ok: false, error: err.trim() || 'Admin approval was declined or setup failed.' })
-    );
+    proc.on('close', async () => {
+      // Trust the actual result (did the task get created/removed?), not the exit code.
+      const exists = await triggerStatus();
+      if (exists === enable) return resolve({ ok: true });
+      resolve({
+        ok: false,
+        error: enable
+          ? `Could not register the trigger (admin prompt declined, or setup failed). ${err.trim()}`.trim()
+          : 'Could not remove the trigger.',
+      });
+    });
   });
 }
 
