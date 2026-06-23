@@ -65,6 +65,18 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+// Send an IPC message to the renderer, waiting for the page to finish loading if
+// it's still booting (cold-boot from the meeting trigger) so the message isn't lost.
+function sendToRenderer(channel, ...args) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const wc = mainWindow.webContents;
+  if (wc.isLoading()) {
+    wc.once('did-finish-load', () => wc.send(channel, ...args));
+  } else {
+    wc.send(channel, ...args);
+  }
+}
+
 // Build a small tray icon (a filled accent dot) in-memory — no icon file needed.
 function makeTrayImage() {
   const W = 32;
@@ -206,30 +218,23 @@ function notifyDone(meeting) {
   }).show();
 }
 
-// Cold-boot meeting prompt: when the trigger launches the app for a meeting, show a
-// notification and self-destruct if the user doesn't record — so nothing lingers.
-let selfDestructTimer = null;
+// Cold-boot meeting prompt: when the trigger launches the app for a meeting, pop the
+// small widget with a "Record it?" prompt — visible, persistent confirmation that the
+// app is ready, with one-click record + an obvious Stop. Closing the widget quits the
+// app, so nothing lingers once the meeting's done.
 async function autoMeetingPrompt() {
   const probe = await probeCalls();
   const name = probe.app || 'Zoom/Teams';
+  showMainWindow(); // show the widget so there's always a clear, clickable control
+  sendToRenderer('call-detected', name); // shows the in-widget "Record it?" banner
   if (Notification.isSupported()) {
-    const n = new Notification({ title: `${name} meeting`, body: 'Click to start recording this meeting.' });
+    const n = new Notification({ title: `${name} meeting`, body: 'Click to start recording — or use the Meeting Notes widget.' });
     n.on('click', () => {
-      if (selfDestructTimer) {
-        clearTimeout(selfDestructTimer);
-        selfDestructTimer = null;
-      }
       showMainWindow();
-      mainWindow?.webContents.send('start-recording');
+      sendToRenderer('start-recording');
     });
     n.show();
   }
-  // Quit if not recording within a few minutes (skip if the user opened the window).
-  selfDestructTimer = setTimeout(() => {
-    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) return;
-    isQuitting = true;
-    app.quit();
-  }, 180000);
 }
 
 // ---- Zoom/Teams call detection (Windows) ----
@@ -271,12 +276,13 @@ function probeCalls() {
 let lastInCall = false;
 
 function promptRecord(app) {
-  mainWindow?.webContents.send('call-detected', app);
+  showMainWindow(); // show the widget so the prompt + Stop are always visible
+  sendToRenderer('call-detected', app);
   if (Notification.isSupported()) {
     const n = new Notification({ title: `${app} call detected`, body: 'Click to start recording this call.' });
     n.on('click', () => {
       showMainWindow(); // so they can see the timer and Stop
-      mainWindow?.webContents.send('start-recording');
+      sendToRenderer('start-recording');
     });
     n.show();
   }
