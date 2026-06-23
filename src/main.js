@@ -18,7 +18,9 @@ let tray = null;
 let isQuitting = false;
 
 function createWindow() {
+  Menu.setApplicationMenu(null); // no File/Edit/View menu bar
   mainWindow = new BrowserWindow({
+    autoHideMenuBar: true,
     width: 380,
     height: 400,
     minWidth: 360,
