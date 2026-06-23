@@ -226,7 +226,20 @@ function notifyDone(meeting) {
 // app, so nothing lingers once the meeting's done.
 async function autoMeetingPrompt() {
   const probe = await probeCalls();
-  const name = probe.app || 'Zoom/Teams';
+  if (probe.app) {
+    // A Zoom/Teams call is genuinely active — prompt right away.
+    promptForMeeting(probe.app);
+    return;
+  }
+  // The trigger fired but no call is active yet (e.g. Zoom just opened, or a
+  // background/update process started it). DON'T prompt — that's the false-alarm
+  // people see. Watch quietly (window stays hidden) for a call to actually start,
+  // and quit silently if none does. Nothing is shown until you're really in a call.
+  watchForCallStart();
+}
+
+// Show the "Record it?" widget + notification for a confirmed, active call.
+function promptForMeeting(name) {
   showMainWindow(); // show the widget so there's always a clear, clickable control
   sendToRenderer('call-detected', name); // shows the in-widget "Record it?" banner
   if (Notification.isSupported()) {
@@ -238,6 +251,37 @@ async function autoMeetingPrompt() {
     n.show();
   }
   startMeetingEndWatch(); // auto-clean up when the call ends
+}
+
+// Bounded, hidden watch after a trigger fired with no active call: prompt if a call
+// starts soon, otherwise quit. Never prompts unless the mic is actually in use.
+let callStartWatch = null;
+let callStartPolls = 0;
+function watchForCallStart() {
+  callStartPolls = 0;
+  if (callStartWatch) clearInterval(callStartWatch);
+  callStartWatch = setInterval(async () => {
+    callStartPolls++;
+    let probe;
+    try {
+      probe = await probeCalls();
+    } catch {
+      return; // transient probe failure — try again next tick
+    }
+    if (probe.app) {
+      clearInterval(callStartWatch);
+      callStartWatch = null;
+      promptForMeeting(probe.app); // a real call started → now prompt
+      return;
+    }
+    // No call. Give up if Zoom/Teams isn't even running, or after ~3 minutes.
+    if (!probe.running || callStartPolls >= 30) {
+      clearInterval(callStartWatch);
+      callStartWatch = null;
+      isQuitting = true;
+      app.quit();
+    }
+  }, 6000);
 }
 
 // While the app is up for a meeting, watch for the call ending (Zoom/Teams releases
