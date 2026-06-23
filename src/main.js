@@ -411,8 +411,10 @@ ipcMain.handle('app:openExternal', (_e, url) => {
 });
 
 // Resize the window between a small side widget ('compact') and a full screen
-// ('expanded'). Compact docks to the bottom-right of the work area so it sits
-// quietly out of the way; expanded centers for settings/meetings/results.
+// ('expanded'). Compact docks to the bottom-right of the work area; expanded is
+// clamped to the visible work area and anchored to the top so the Settings
+// header/tabs are always reachable (a centered window taller than the screen
+// would push the top off-screen).
 const WIN_COMPACT = { w: 380, h: 400 };
 const WIN_EXPANDED = { w: 860, h: 820 };
 let lastWindowMode = null;
@@ -420,14 +422,19 @@ function applyWindowMode(mode) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isFullScreen() || mainWindow.isMaximized()) return;
   const expanded = mode === 'expanded';
-  const { w, h } = expanded ? WIN_EXPANDED : WIN_COMPACT;
+  const wa = screen.getPrimaryDisplay().workArea;
+  const target = expanded ? WIN_EXPANDED : WIN_COMPACT;
+  // Never exceed the visible work area, leaving a small margin.
+  const w = Math.min(target.w, wa.width - 16);
+  const h = Math.min(target.h, wa.height - 16);
   mainWindow.setResizable(expanded);
   mainWindow.setContentSize(w, h);
+  const [ow, oh] = mainWindow.getSize();
   if (expanded) {
-    mainWindow.center();
+    // Top-anchored and horizontally centered → header is always on screen.
+    const x = Math.round(wa.x + (wa.width - ow) / 2);
+    mainWindow.setPosition(Math.max(wa.x, x), wa.y + 8);
   } else {
-    const wa = screen.getPrimaryDisplay().workArea;
-    const [ow, oh] = mainWindow.getSize();
     mainWindow.setPosition(
       Math.max(wa.x, wa.x + wa.width - ow - 24),
       Math.max(wa.y, wa.y + wa.height - oh - 24)
