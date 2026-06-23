@@ -8,15 +8,14 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">
+      <button id="brandHome" class="brand" title="Back to record">
         <span class="dot"></span>
-        Meeting Notes
+        <span class="brand-name">Meeting Notes</span>
+      </button>
+      <div class="topbar-actions">
+        <button id="navMeetings" class="iconbtn" title="Meetings">🗂</button>
+        <button id="settingsBtn" class="iconbtn" title="Settings">⚙</button>
       </div>
-      <div class="nav">
-        <button id="navRecord" class="navbtn active">Record</button>
-        <button id="navMeetings" class="navbtn">Meetings</button>
-      </div>
-      <button id="settingsBtn" class="ghost" title="Settings">⚙ Settings</button>
     </header>
 
     <main>
@@ -30,11 +29,6 @@
           </span>
         </div>
         <section class="recorder">
-          <div class="mode-toggle">
-            <span class="mode-label">Transcription</span>
-            <button id="modeLocal" class="seg" data-mode="local">Local GPU</button>
-            <button id="modeCloud" class="seg" data-mode="cloud">Cloud</button>
-          </div>
           <button id="recordBtn" class="record">● Record</button>
           <div id="timer" class="timer">00:00</div>
           <div id="status" class="status">Ready.</div>
@@ -93,10 +87,13 @@
       </section>
     </main>
 
-    <!-- Settings modal -->
-    <div id="settingsModal" class="modal hidden">
-      <div class="modal-box">
-        <h2>Settings</h2>
+    <!-- Settings (full screen) -->
+    <section id="settingsView" class="settings-view hidden">
+      <div class="modal-box settings-box">
+        <div class="settings-head">
+          <button id="settingsBack" class="iconbtn" title="Back to record">←</button>
+          <h2>Settings</h2>
+        </div>
 
         <div class="tabs">
           <button class="tab active" data-tab="general">General</button>
@@ -106,6 +103,17 @@
 
         <!-- GENERAL -->
         <div class="tab-pane active" data-pane="general">
+          <h3 class="group">Transcription</h3>
+          <label>
+            <span class="field-label">Engine
+              <span class="info" data-tip="How speech is turned into text. Local GPU (WhisperX) is free and private but ties up your GPU; Cloud (AssemblyAI) is near-instant with a free tier. Configure each on the Local / Cloud tabs.">i</span>
+            </span>
+            <select id="transcriptionMode">
+              <option value="local">Local GPU — WhisperX, free (needs Python + GPU)</option>
+              <option value="cloud">Cloud — AssemblyAI (API key; free tier)</option>
+            </select>
+          </label>
+
           <h3 class="group">Summarization</h3>
           <label>
             <span class="field-label">Engine
@@ -336,7 +344,7 @@
           <button id="settingsSave" class="primary">Save</button>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- First-run setup wizard -->
     <div id="wizard" class="modal hidden">

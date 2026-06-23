@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   createClickupTask: (item, summary, parentId) => ipcRenderer.invoke('clickup:create', { item, summary, parentId }),
   getClickupListUrl: () => ipcRenderer.invoke('clickup:listUrl'),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+  setWindowMode: (mode) => ipcRenderer.invoke('window:mode', mode),
   // Meetings library
   listMeetings: () => ipcRenderer.invoke('meetings:list'),
   updateMeeting: (id, patch) => ipcRenderer.invoke('meetings:update', { id, patch }),

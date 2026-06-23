@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Notification, shell, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Notification, shell, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -19,12 +19,13 @@ let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 780,
-    minWidth: 640,
-    minHeight: 560,
+    width: 380,
+    height: 400,
+    minWidth: 360,
+    minHeight: 340,
     title: 'Meeting Notes',
     backgroundColor: '#0f1115',
+    resizable: false, // starts as a compact widget; the renderer expands it on demand
     show: false, // shown explicitly unless launched hidden into the tray
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -406,6 +407,33 @@ ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
 ipcMain.handle('app:openExternal', (_e, url) => {
   if (/^https?:\/\//i.test(url)) shell.openExternal(url);
 });
+
+// Resize the window between a small side widget ('compact') and a full screen
+// ('expanded'). Compact docks to the bottom-right of the work area so it sits
+// quietly out of the way; expanded centers for settings/meetings/results.
+const WIN_COMPACT = { w: 380, h: 400 };
+const WIN_EXPANDED = { w: 860, h: 820 };
+let lastWindowMode = null;
+function applyWindowMode(mode) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isFullScreen() || mainWindow.isMaximized()) return;
+  const expanded = mode === 'expanded';
+  const { w, h } = expanded ? WIN_EXPANDED : WIN_COMPACT;
+  mainWindow.setResizable(expanded);
+  mainWindow.setContentSize(w, h);
+  if (expanded) {
+    mainWindow.center();
+  } else {
+    const wa = screen.getPrimaryDisplay().workArea;
+    const [ow, oh] = mainWindow.getSize();
+    mainWindow.setPosition(
+      Math.max(wa.x, wa.x + wa.width - ow - 24),
+      Math.max(wa.y, wa.y + wa.height - oh - 24)
+    );
+  }
+  lastWindowMode = mode;
+}
+ipcMain.handle('window:mode', (_e, mode) => applyWindowMode(mode));
 
 ipcMain.handle('clickup:listUrl', async () => {
   const s = loadSettings();

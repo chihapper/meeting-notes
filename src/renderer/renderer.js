@@ -19,6 +19,8 @@ async function startRecording() {
   activeStreams = [];
   $('progress').classList.add('hidden');
   $('callBanner').classList.add('hidden');
+  $('results').classList.add('hidden'); // clear any prior result → back to compact
+  showView('record');
 
   const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   activeStreams.push(micStream);
@@ -120,8 +122,8 @@ function setStatus(msg) {
 
 function setMode(mode) {
   currentMode = mode === 'cloud' ? 'cloud' : 'local';
-  $('modeLocal').classList.toggle('active', currentMode === 'local');
-  $('modeCloud').classList.toggle('active', currentMode === 'cloud');
+  const sel = $('transcriptionMode');
+  if (sel) sel.value = currentMode;
 }
 
 // Gray out Record unless the active transcription + summarizer are configured.
@@ -207,6 +209,7 @@ function renderResults(meeting, clickup) {
   $('transcript').textContent = meeting.transcript || '';
   buildSpeakers(meeting);
   $('results').classList.remove('hidden');
+  applyWindowMode('record'); // results are showing → grow the window
 }
 
 // One action-item row. The checkbox is a persistent "done" toggle; when ClickUp
@@ -458,9 +461,18 @@ function escapeHtml(s) {
 function showView(view) {
   $('recordView').classList.toggle('hidden', view !== 'record');
   $('meetingsView').classList.toggle('hidden', view !== 'meetings');
-  $('navRecord').classList.toggle('active', view === 'record');
+  $('settingsView').classList.toggle('hidden', view !== 'settings');
   $('navMeetings').classList.toggle('active', view === 'meetings');
+  $('settingsBtn').classList.toggle('active', view === 'settings');
   if (view === 'meetings') showMeetings();
+  applyWindowMode(view);
+}
+
+// Compact widget on the bare Record screen; full window for results, Meetings,
+// and Settings.
+function applyWindowMode(view) {
+  const compact = view === 'record' && $('results').classList.contains('hidden');
+  window.api.setWindowMode(compact ? 'compact' : 'expanded');
 }
 
 // ---------- Settings ----------
@@ -536,6 +548,7 @@ async function populateOpenaiModels(selected) {
 
 async function openSettings() {
   const s = await window.api.getSettings();
+  $('transcriptionMode').value = s.transcriptionMode || 'local';
   $('summarizerMode').value = s.summarizerMode || 'ollama';
   $('ollamaUrl').value = s.ollamaUrl || 'http://localhost:11434';
   $('unloadOllama').checked = !!s.unloadOllama;
@@ -568,7 +581,7 @@ async function openSettings() {
   applySummarizerVisibility();
   applyDestinationVisibility();
   $('testResults').innerHTML = '';
-  $('settingsModal').classList.remove('hidden');
+  showView('settings');
 }
 
 function readSettingsForm() {
@@ -621,7 +634,7 @@ async function saveSettings() {
     }
   }
 
-  $('settingsModal').classList.add('hidden');
+  showView('record');
   setStatus('Settings saved.');
   updateRecordReadiness();
 }
@@ -698,6 +711,7 @@ async function finishWizard() {
   });
   $('wizard').classList.add('hidden');
   setMode(trans);
+  showView('record'); // shrink to the compact widget
   setStatus('Setup complete. Press Record to start.');
   updateRecordReadiness();
 }
@@ -755,15 +769,19 @@ $('recordBtn').addEventListener('mouseenter', () => {
 });
 $('recordBtn').addEventListener('mouseleave', hideTip);
 
-$('modeLocal').onclick = async () => { setMode('local'); await window.api.saveSettings({ transcriptionMode: 'local' }); updateRecordReadiness(); };
-$('modeCloud').onclick = async () => { setMode('cloud'); await window.api.saveSettings({ transcriptionMode: 'cloud' }); updateRecordReadiness(); };
+$('transcriptionMode').onchange = async () => {
+  setMode($('transcriptionMode').value);
+  await window.api.saveSettings({ transcriptionMode: currentMode });
+  updateRecordReadiness();
+};
 $('applyNamesBtn').onclick = applyNames;
 
-$('navRecord').onclick = () => showView('record');
+$('brandHome').onclick = () => showView('record');
 $('navMeetings').onclick = () => showView('meetings');
 
 $('settingsBtn').onclick = openSettings;
-$('settingsCancel').onclick = () => $('settingsModal').classList.add('hidden');
+$('settingsBack').onclick = () => showView('record');
+$('settingsCancel').onclick = () => showView('record');
 $('settingsSave').onclick = saveSettings;
 $('testBtn').onclick = testConnections;
 $('summarizerMode').onchange = () => {
@@ -794,6 +812,7 @@ $('wizardFinish').onclick = finishWizard;
 $('wizardSkip').onclick = async () => {
   await window.api.saveSettings({ setupComplete: true });
   $('wizard').classList.add('hidden');
+  showView('record'); // shrink to the compact widget
   setStatus('You can configure everything in ⚙ Settings.');
   updateRecordReadiness();
 };
@@ -840,8 +859,10 @@ window.api.getSettings().then((s) => {
   if (!s.setupComplete) {
     wizardVisibility();
     $('wizard').classList.remove('hidden');
+    window.api.setWindowMode('expanded'); // give the first-run wizard room
     setStatus('Welcome — finish setup to begin.');
   } else {
+    showView('record'); // compact widget
     setStatus(currentMode === 'cloud' ? 'Ready (cloud transcription).' : 'Ready (local transcription).');
   }
   updateRecordReadiness();

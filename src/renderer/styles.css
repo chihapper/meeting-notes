@@ -29,16 +29,21 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 600; background: transparent; border: none; color: var(--text); padding: 4px 6px; border-radius: 8px; }
+.brand:hover { filter: none; background: var(--panel-2); }
+.brand-name { font-size: 14px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
 
 main { padding: 20px; overflow-y: auto; height: calc(100vh - 57px); }
 
-/* Top nav */
-.nav { display: flex; gap: 4px; }
-.navbtn { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 7px 16px; }
-.navbtn:hover { filter: none; color: var(--text); }
-.navbtn.active { background: var(--panel-2); border-color: var(--border); color: var(--text); }
+/* Top icon buttons */
+.topbar-actions { display: flex; gap: 4px; }
+.iconbtn {
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  padding: 6px 10px; font-size: 16px; line-height: 1; border-radius: 8px;
+}
+.iconbtn:hover { filter: none; color: var(--text); background: var(--panel-2); }
+.iconbtn.active { background: var(--panel-2); border-color: var(--border); color: var(--text); }
 
 /* Segmented choice groups (wizard) */
 .seg-group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -61,8 +66,8 @@ main { padding: 20px; overflow-y: auto; height: calc(100vh - 57px); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 28px 0 20px;
+  gap: 14px;
+  padding: 20px 0 16px;
 }
 
 button {
@@ -103,8 +108,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .call-banner-actions { display: flex; gap: 8px; white-space: nowrap; }
 
-.mode-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.mode-label { color: var(--muted); font-size: 13px; }
 .seg { padding: 6px 14px; font-size: 13px; }
 .seg.active { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
 
@@ -170,6 +173,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .transcript { white-space: pre-wrap; line-height: 1.5; color: var(--muted); max-height: 300px; overflow-y: auto; }
 details summary { cursor: pointer; color: var(--muted); text-transform: uppercase; font-size: 15px; letter-spacing: 0.5px; }
+
+/* Full-screen Settings view (reuses .modal-box styling) */
+.settings-view { max-width: 720px; margin: 0 auto; }
+.settings-box { width: 100%; max-width: none; max-height: none; padding: 0; border: none; background: transparent; }
+.settings-head { display: flex; align-items: center; gap: 10px; }
+.settings-head h2 { margin: 0; }
 
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
