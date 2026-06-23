@@ -36,6 +36,7 @@ $ZoomTask = 'MeetingNotesZoom'
 $TeamsTask = 'MeetingNotesTeams'
 $WatcherDir = Join-Path $env:LOCALAPPDATA 'MeetingNotes'
 $WatcherPath = Join-Path $WatcherDir 'teams-call-watcher.ps1'
+$VbsPath = Join-Path $WatcherDir 'teams-call-watcher.vbs'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
 if (-not $isAdmin) { Write-Error 'Please run this in an Administrator PowerShell.'; return }
@@ -43,7 +44,7 @@ if (-not $isAdmin) { Write-Error 'Please run this in an Administrator PowerShell
 if ($Uninstall) {
   schtasks /Delete /TN $ZoomTask /F 2>$null | Out-Null
   schtasks /Delete /TN $TeamsTask /F 2>$null | Out-Null
-  Remove-Item $WatcherPath -ErrorAction SilentlyContinue
+  Remove-Item $WatcherPath, $VbsPath -ErrorAction SilentlyContinue
   Write-Host 'Removed the Zoom/Teams launch tasks and watcher.'
   Write-Host 'To also disable process auditing: auditpol /set /subcategory:"Process Creation" /success:disable'
   return
@@ -126,8 +127,11 @@ while (Teams-Running) {
 }
 '@
     Set-Content -Path $WatcherPath -Value $watcher -Encoding UTF8
-    $watcherArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$WatcherPath`" -ExePath `"$ExePath`""
-    Register-LaunchTask $TeamsTask $teamsPaths 'powershell.exe' $watcherArgs
+    # Launch the watcher through a tiny VBScript so it runs with NO console window
+    # (Task Scheduler shows a console for a powershell.exe action while you're logged on).
+    $vbs = 'CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""' + $WatcherPath + '"" -ExePath ""' + $ExePath + '""", 0, False'
+    Set-Content -Path $VbsPath -Value $vbs -Encoding ASCII
+    Register-LaunchTask $TeamsTask $teamsPaths 'wscript.exe' ('"' + $VbsPath + '"')
     Write-Host 'Teams trigger registered:'
     $teamsPaths | ForEach-Object { Write-Host "  - $_" }
   }
