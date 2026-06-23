@@ -127,7 +127,7 @@ function createTray() {
 // Apply login-item + tray state from settings (called at startup and after Save).
 function applyBackgroundSettings(s) {
   if (process.platform === 'win32') {
-    app.setLoginItemSettings({ openAtLogin: !!s.autoStartLogin, args: ['--hidden'] });
+    app.setLoginItemSettings({ openAtLogin: !!s.autoStartLogin, args: ['--background'] });
   }
   if (s.runInBackground) {
     createTray();
@@ -151,17 +151,31 @@ app.whenReady().then(() => {
   app.setAppUserModelId('com.meetingnotes.app'); // so Windows toasts show the app name
   const settings = loadSettings();
   createWindow();
-  applyBackgroundSettings(settings);
 
-  // Stay hidden in the tray when launched at login (or with --hidden) in background mode.
-  const launchedHidden =
-    process.argv.includes('--hidden') ||
-    (process.platform === 'win32' && app.getLoginItemSettings().wasOpenedAtLogin);
-  if (!(settings.runInBackground && launchedHidden)) {
-    mainWindow.show();
+  // Keep the login-item registration in sync (used only for the opt-in resident mode).
+  if (process.platform === 'win32') {
+    app.setLoginItemSettings({ openAtLogin: !!settings.autoStartLogin, args: ['--background'] });
   }
 
-  startCallWatcher();
+  const autoLaunched = process.argv.includes('--hidden'); // launched by the meeting trigger
+  const residentLaunch =
+    process.argv.includes('--background') ||
+    (process.platform === 'win32' && app.getLoginItemSettings().wasOpenedAtLogin);
+
+  if (autoLaunched) {
+    // Boot cold for a meeting: notify, then quit if the user doesn't record. No tray,
+    // nothing resident — RAM is used only briefly, or while actually recording.
+    autoMeetingPrompt();
+  } else if (residentLaunch && settings.runInBackground) {
+    // Opt-in resident mode: stay hidden in the tray and watch for calls.
+    createTray();
+    startCallWatcher();
+  } else {
+    if (settings.runInBackground) createTray();
+    mainWindow.show();
+    startCallWatcher();
+  }
+
   app.on('activate', () => showMainWindow());
 });
 
@@ -187,6 +201,32 @@ function notifyDone(meeting) {
     title: 'Meeting Notes — summary ready',
     body: `${n} action item${n === 1 ? '' : 's'} captured.`,
   }).show();
+}
+
+// Cold-boot meeting prompt: when the trigger launches the app for a meeting, show a
+// notification and self-destruct if the user doesn't record — so nothing lingers.
+let selfDestructTimer = null;
+async function autoMeetingPrompt() {
+  const probe = await probeCalls();
+  const name = probe.app || 'Zoom/Teams';
+  if (Notification.isSupported()) {
+    const n = new Notification({ title: `${name} meeting`, body: 'Click to start recording this meeting.' });
+    n.on('click', () => {
+      if (selfDestructTimer) {
+        clearTimeout(selfDestructTimer);
+        selfDestructTimer = null;
+      }
+      showMainWindow();
+      mainWindow?.webContents.send('start-recording');
+    });
+    n.show();
+  }
+  // Quit if not recording within a few minutes (skip if the user opened the window).
+  selfDestructTimer = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) return;
+    isQuitting = true;
+    app.quit();
+  }, 180000);
 }
 
 // ---- Zoom/Teams call detection (Windows) ----

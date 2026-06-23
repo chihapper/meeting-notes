@@ -476,15 +476,6 @@ function applyDestinationVisibility() {
   $('destClickup').classList.toggle('hidden', $('taskDestination').value !== 'clickup');
 }
 
-// The auto-launch switch owns these three helpers — force them on and lock them
-// while it's enabled, so you can't create a broken half-configured state.
-function applyAutoLaunchLock() {
-  const on = $('autoLaunchTrigger').checked;
-  ['runInBackground', 'watchCalls', 'autoQuitNoCall'].forEach((id) => {
-    if (on) $(id).checked = true;
-    $(id).disabled = on;
-  });
-}
 
 // Fill the Model dropdown with the models actually pulled in Ollama.
 // Curated fallbacks used only when the live API list is unavailable (no key yet).
@@ -566,7 +557,6 @@ async function openSettings() {
   $('autoQuitNoCall').checked = !!s.autoQuitNoCall;
   triggerInitial = await window.api.getTriggerStatus();
   $('autoLaunchTrigger').checked = triggerInitial;
-  applyAutoLaunchLock();
   $('triggerStatus').textContent = '';
   $('assemblyaiKey').value = s.assemblyaiKey || '';
   $('hfToken').value = s.hfToken || '';
@@ -784,8 +774,6 @@ $('summarizerMode').onchange = () => {
   else if (mode === 'openai') populateOpenaiModels($('openaiModel').value);
 };
 $('taskDestination').onchange = applyDestinationVisibility;
-// Auto-launch owns background + call-watch + auto-quit: force them on and lock them.
-$('autoLaunchTrigger').onchange = applyAutoLaunchLock;
 $('ollamaRefresh').onclick = () => populateOllamaModels($('ollamaModel').value);
 $('anthropicRefresh').onclick = () => populateAnthropicModels($('anthropicModel').value);
 $('openaiRefresh').onclick = () => populateOpenaiModels($('openaiModel').value);

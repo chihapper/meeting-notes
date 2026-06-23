@@ -207,35 +207,36 @@
           </label>
 
           <h3 class="group">Auto-record meetings (Windows)</h3>
-          <p class="pane-note">One switch for the whole hands-off flow: the app launches only when a Zoom/Teams meeting starts, notifies you (click the notification to start recording), and quits when the meeting apps close. For Google Meet or anything else, just open the app and hit Record.</p>
+          <p class="pane-note">Nothing runs until a Zoom/Teams meeting starts — then the app boots cold, shows a notification (click it to start recording), and quits itself if you don't. It only uses memory briefly, or while actually recording. For Google Meet or anything else, just open the app and hit Record.</p>
           <label class="checkbox">
             <input id="autoLaunchTrigger" type="checkbox" />
             <strong>Auto-launch &amp; notify for Zoom/Teams meetings</strong>
-            <span class="info" data-tip="The all-in-one switch. Registers a one-time Windows trigger (asks for admin approval once — no PowerShell) and turns on the helper options under Advanced. Windows only; doesn't cover Google Meet.">i</span>
+            <span class="info" data-tip="Registers a one-time Windows trigger (asks for admin approval once — no PowerShell). When a meeting starts the app boots, notifies you, and quits if you don't record. Windows only; doesn't cover Google Meet.">i</span>
           </label>
           <div id="triggerStatus" class="meta"></div>
 
           <details class="adv">
-            <summary>Advanced (handled for you by the switch above)</summary>
+            <summary>Advanced — optional "always-on tray" mode (most people don't need this)</summary>
+            <p class="pane-note">A separate, opt-in way to keep the app <em>resident</em> in the tray watching for calls, instead of the cold-boot flow above. This one <strong>does</strong> use memory continuously. Leave these off if you're using the switch above.</p>
+            <label class="checkbox">
+              <input id="autoStartLogin" type="checkbox" />
+              Start in the tray at login
+              <span class="info" data-tip="Keep the app resident in the tray from login so it's always watching for calls. Uses memory continuously — the auto-record switch above avoids this.">i</span>
+            </label>
             <label class="checkbox">
               <input id="runInBackground" type="checkbox" />
-              Run in the system tray when closed
-              <span class="info" data-tip="Closing the window hides the app to the tray instead of quitting, so it can keep watching and notifying. Required for the auto-record switch.">i</span>
+              Close to tray instead of quitting
+              <span class="info" data-tip="When resident, closing the window hides to the tray instead of quitting.">i</span>
             </label>
             <label class="checkbox">
               <input id="watchCalls" type="checkbox" />
               Show the record prompt when a call starts
-              <span class="info" data-tip="While the app is running, watch for Zoom/Teams using the mic and pop the record prompt. Required for the auto-record switch. It never records on its own — you're always asked.">i</span>
+              <span class="info" data-tip="While resident, watch for Zoom/Teams using the mic and pop the record prompt. Never records on its own.">i</span>
             </label>
             <label class="checkbox">
               <input id="autoQuitNoCall" type="checkbox" />
-              Quit when both Zoom and Teams are closed
-              <span class="info" data-tip="Frees memory by quitting once neither app is running. Required for the auto-record switch so nothing lingers between meetings.">i</span>
-            </label>
-            <label class="checkbox">
-              <input id="autoStartLogin" type="checkbox" />
-              Start at login (hidden) — not needed with auto-launch
-              <span class="info" data-tip="An alternative to the trigger: keep the app resident in the tray from login. You don't need this if the auto-launch switch is on.">i</span>
+              Quit when both Zoom and Teams close
+              <span class="info" data-tip="While resident, quit once neither Zoom nor Teams is running.">i</span>
             </label>
           </details>
         </div>
