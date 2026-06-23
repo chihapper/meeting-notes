@@ -16,6 +16,8 @@ const { testConnections, checkReadiness } = require('./services/diagnostics');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let rendererRecording = false; // whether the renderer is currently capturing audio
+let quitAfterProcessing = false; // quit once the in-flight recording finishes processing
 
 function createWindow() {
   Menu.setApplicationMenu(null); // no File/Edit/View menu bar
@@ -235,6 +237,53 @@ async function autoMeetingPrompt() {
     });
     n.show();
   }
+  startMeetingEndWatch(); // auto-clean up when the call ends
+}
+
+// While the app is up for a meeting, watch for the call ending (Zoom/Teams releases
+// the mic). If you forgot to stop a recording, stop it so it still gets transcribed
+// + saved, then quit. If you never recorded, just quit — so nothing lingers.
+let meetingWatch = null;
+let sawCall = false;
+let noCallPolls = 0;
+function startMeetingEndWatch() {
+  sawCall = false;
+  noCallPolls = 0;
+  if (meetingWatch) clearInterval(meetingWatch);
+  meetingWatch = setInterval(pollMeetingEnd, 8000);
+}
+async function pollMeetingEnd() {
+  let probe;
+  try {
+    probe = await probeCalls();
+  } catch {
+    return; // transient probe failure — try again next tick
+  }
+  if (probe.app) {
+    // A Zoom/Teams call is active right now.
+    sawCall = true;
+    noCallPolls = 0;
+    return;
+  }
+  noCallPolls++;
+  // Confirm the call really ended (a couple of clear polls avoids brief mic blips).
+  // Before we ever saw the call start, also give up if no Zoom/Teams is even running.
+  const ended = sawCall ? noCallPolls >= 2 : (!probe.running && noCallPolls >= 3);
+  if (ended) onMeetingEnded();
+}
+function onMeetingEnded() {
+  if (rendererRecording) {
+    // Forgot to hit Stop — stop the recording so it processes + saves, then quit.
+    if (meetingWatch) { clearInterval(meetingWatch); meetingWatch = null; }
+    quitAfterProcessing = true;
+    sendToRenderer('stop-recording');
+    return;
+  }
+  // Not recording. Don't yank a window you're actively reading — retry next poll.
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) return;
+  if (meetingWatch) { clearInterval(meetingWatch); meetingWatch = null; }
+  isQuitting = true;
+  app.quit();
 }
 
 // ---- Zoom/Teams call detection (Windows) ----
@@ -403,9 +452,19 @@ ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
 
     sendProgress('done', 'Done');
     notifyDone(meeting);
+    // If the call ended while a recording was still running, we auto-stopped it and
+    // processed it — now quit (the meeting is safe in the library / ClickUp).
+    if (quitAfterProcessing) {
+      quitAfterProcessing = false;
+      setTimeout(() => { isQuitting = true; app.quit(); }, 6000);
+    }
     return { ok: true, meeting };
   } catch (err) {
     sendProgress('error', err.message);
+    if (quitAfterProcessing) {
+      quitAfterProcessing = false;
+      setTimeout(() => { isQuitting = true; app.quit(); }, 8000);
+    }
     return { ok: false, error: err.message };
   } finally {
     fs.unlink(tmpPath, () => {});
@@ -414,6 +473,12 @@ ipcMain.handle('recording:process', async (_e, arrayBuffer) => {
 
 ipcMain.handle('app:openExternal', (_e, url) => {
   if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+});
+
+// The renderer reports when it starts/stops capturing, so the meeting-end watcher
+// knows whether a forgotten recording is still running when the call ends.
+ipcMain.handle('recording:state', (_e, on) => {
+  rendererRecording = !!on;
 });
 
 // Resize the window between a small side widget ('compact') and a full screen

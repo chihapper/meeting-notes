@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   getClickupListUrl: () => ipcRenderer.invoke('clickup:listUrl'),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   setWindowMode: (mode) => ipcRenderer.invoke('window:mode', mode),
+  setRecordingState: (on) => ipcRenderer.invoke('recording:state', on),
   // Meetings library
   listMeetings: () => ipcRenderer.invoke('meetings:list'),
   updateMeeting: (id, patch) => ipcRenderer.invoke('meetings:update', { id, patch }),
@@ -38,5 +39,10 @@ contextBridge.exposeInMainWorld('api', {
     const handler = () => cb();
     ipcRenderer.on('start-recording', handler);
     return () => ipcRenderer.removeListener('start-recording', handler);
+  },
+  onStopRecording: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('stop-recording', handler);
+    return () => ipcRenderer.removeListener('stop-recording', handler);
   },
 });

@@ -114,6 +114,9 @@ function setRecordingUI(recording) {
   const btn = $('recordBtn');
   btn.textContent = recording ? '■ Stop' : '● Record';
   btn.classList.toggle('recording', recording);
+  // Let the main process know, so it can auto-stop a forgotten recording when the
+  // call ends (and quit afterward).
+  window.api.setRecordingState(recording);
 }
 
 function setStatus(msg) {
@@ -849,6 +852,13 @@ window.api.onStartRecording(async () => {
   } catch (err) {
     setStatus(`Could not start recording: ${err.message}`);
     setRecordingUI(false);
+  }
+});
+// The call ended while still recording (you forgot to stop) — stop and process it.
+window.api.onStopRecording(() => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    setStatus('Call ended — wrapping up the recording…');
+    stopRecording();
   }
 });
 
